@@ -8,7 +8,7 @@ struct CalendarOption: Identifiable {
     let title: String
 }
 
-/// 日历管理器 - 负责所有日历相关操作
+/// 日历管理器 - 负责所有日历相关操作（支持读写分离）
 @MainActor
 class CalendarManager: NSObject, ObservableObject {
     static let shared = CalendarManager()
@@ -21,16 +21,56 @@ class CalendarManager: NSObject, ObservableObject {
     @Published var lastScannedEventCount: Int = 0
     @Published var availableCalendars: [CalendarOption] = []
     @Published var processingLogs: [String] = []
+    
+    // MARK: - 读写分离模式相关属性
+    
+    /// 是否启用分离模式（读和写使用不同日历）
+    @Published var useSeparateCalendars: Bool = false {
+        didSet {
+            UserDefaults.standard.set(useSeparateCalendars, forKey: "useSeparateCalendars")
+        }
+    }
+    
+    /// 源日历标识符（读取航班事件）
+    @Published var sourceCalendarIdentifier: String? {
+        didSet {
+            UserDefaults.standard.set(sourceCalendarIdentifier, forKey: "sourceCalendarIdentifier")
+        }
+    }
+    
+    /// 目标日历标识符（写入格式化后的事件）
+    @Published var targetCalendarIdentifier: String? {
+        didSet {
+            UserDefaults.standard.set(targetCalendarIdentifier, forKey: "targetCalendarIdentifier")
+        }
+    }
+    
+    /// 是否复制告警到新事件（仅在分离模式下）
+    @Published var copyAlarmsToNewEvents: Bool = true {
+        didSet {
+            UserDefaults.standard.set(copyAlarmsToNewEvents, forKey: "copyAlarmsToNewEvents")
+        }
+    }
+    
+    // MARK: - 单日历模式相关属性（向后兼容）
+    
+    /// 统一日历选择（仅在非分离模式下使用）
     @Published var selectedCalendarIdentifier: String? {
         didSet {
             UserDefaults.standard.set(selectedCalendarIdentifier, forKey: "selectedCalendarIdentifier")
         }
     }
+    
     @Published var hasCalendarAccess: Bool = false
     
     override init() {
         super.init()
+        // 恢复用户偏好
         selectedCalendarIdentifier = UserDefaults.standard.string(forKey: "selectedCalendarIdentifier")
+        useSeparateCalendars = UserDefaults.standard.bool(forKey: "useSeparateCalendars")
+        sourceCalendarIdentifier = UserDefaults.standard.string(forKey: "sourceCalendarIdentifier")
+        targetCalendarIdentifier = UserDefaults.standard.string(forKey: "targetCalendarIdentifier")
+        copyAlarmsToNewEvents = UserDefaults.standard.object(forKey: "copyAlarmsToNewEvents") as? Bool ?? true
         checkCalendarAccess()
     }
     
@@ -94,10 +134,20 @@ class CalendarManager: NSObject, ObservableObject {
             CalendarOption(id: calendar.calendarIdentifier, title: calendar.title)
         }
         
-        // 如果之前选择的日历不存在，清除选择
+        // 检查之前的选择是否仍然有效
         if let selected = selectedCalendarIdentifier,
            !calendars.contains(where: { $0.calendarIdentifier == selected }) {
             selectedCalendarIdentifier = nil
+        }
+        
+        if let source = sourceCalendarIdentifier,
+           !calendars.contains(where: { $0.calendarIdentifier == source }) {
+            sourceCalendarIdentifier = nil
+        }
+        
+        if let target = targetCalendarIdentifier,
+           !calendars.contains(where: { $0.calendarIdentifier == target }) {
+            targetCalendarIdentifier = nil
         }
         
         appendLog("🔄 刷新日历列表: 找到 \(calendars.count) 个可写日历")
@@ -105,8 +155,17 @@ class CalendarManager: NSObject, ObservableObject {
     
     // MARK: - 事件处理
     
-    /// 格式化即将到来的航班事件
+    /// 格式化即将到来的航班事件（主入口）
     func formatUpcomingFlightEvents() -> (formatted: Int, total: Int) {
+        if useSeparateCalendars {
+            return formatFlightEventsWithSeparateCalendars()
+        } else {
+            return formatFlightEventsWithSingleCalendar()
+        }
+    }
+    
+    /// 单日历模式：读和写同一个日历
+    private func formatFlightEventsWithSingleCalendar() -> (formatted: Int, total: Int) {
         guard let calendarId = selectedCalendarIdentifier else {
             statusMessage = "请先选择日历"
             appendLog("⚠️ 未选择日历")
@@ -120,7 +179,7 @@ class CalendarManager: NSObject, ObservableObject {
         }
         
         statusMessage = "正在扫描日历..."
-        appendLog("📅 开始扫描日历...")
+        appendLog("📅 开始扫描日历（单日历模式）...")
         
         let today = Date()
         let endDate = Calendar.current.date(byAdding: .year, value: 1, to: today) ?? today
@@ -164,6 +223,114 @@ class CalendarManager: NSObject, ObservableObject {
         appendLog("🎉 \(message)")
         
         return (formattedCount, flightEvents.count)
+    }
+    
+    /// 分离日历模式：从源日历读取，写入到目标日历
+    private func formatFlightEventsWithSeparateCalendars() -> (formatted: Int, total: Int) {
+        guard let sourceId = sourceCalendarIdentifier else {
+            statusMessage = "请先选择源日历（读取）"
+            appendLog("⚠️ 未选择源日历")
+            return (0, 0)
+        }
+        
+        guard let targetId = targetCalendarIdentifier else {
+            statusMessage = "请先选择目标日历（写入）"
+            appendLog("⚠️ 未选择目标日历")
+            return (0, 0)
+        }
+        
+        guard sourceId != targetId else {
+            statusMessage = "源日历和目标日历不能相同，请使用单日历模式"
+            appendLog("⚠️ 源日历和目标日历相同")
+            return (0, 0)
+        }
+        
+        guard let sourceCalendar = eventStore.calendar(withIdentifier: sourceId) else {
+            statusMessage = "找不到源日历"
+            appendLog("❌ 找不到源日历")
+            return (0, 0)
+        }
+        
+        guard let targetCalendar = eventStore.calendar(withIdentifier: targetId) else {
+            statusMessage = "找不到目标日历"
+            appendLog("❌ 找不到目标日历")
+            return (0, 0)
+        }
+        
+        statusMessage = "正在处理..."
+        appendLog("📅 从 '\(sourceCalendar.title)' 读取，写入到 '\(targetCalendar.title)'...")
+        
+        let today = Date()
+        let endDate = Calendar.current.date(byAdding: .year, value: 1, to: today) ?? today
+        let predicate = eventStore.predicateForEvents(withStart: today, end: endDate, calendars: [sourceCalendar])
+        
+        let events = eventStore.events(matching: predicate)
+        let flightEvents = events.filter { $0.title.contains("航旅纵横") }
+        
+        appendLog("📊 源日历扫描结果: 总事件 \(events.count)，航班事件 \(flightEvents.count)")
+        
+        var formattedCount = 0
+        var skippedCount = 0
+        
+        for sourceEvent in flightEvents {
+            if let flightDetails = FlightParser.parseFlightEvent(sourceEvent.title) {
+                let newTitle = FlightParser.formatFlightTitle(from: flightDetails)
+                
+                // 检查是否已经在目标日历中存在相同的事件
+                if doesEventExistInTargetCalendar(withTitle: newTitle, calendar: targetCalendar) {
+                    skippedCount += 1
+                    appendLog("⏭️ 跳过重复事件: \(newTitle)")
+                    continue
+                }
+                
+                // 创建新事件到目标日历
+                let newEvent = EKEvent()
+                newEvent.title = newTitle
+                newEvent.startDate = sourceEvent.startDate
+                newEvent.endDate = sourceEvent.endDate
+                newEvent.calendar = targetCalendar
+                
+                // 添加备注（保留原始信息）
+                let notes = "📌 原始标题: \(sourceEvent.title)\n📅 来源日历: \(sourceCalendar.title)"
+                newEvent.notes = notes
+                
+                // 复制告警（如果启用）
+                if copyAlarmsToNewEvents, let alarms = sourceEvent.alarms, !alarms.isEmpty {
+                    newEvent.alarms = alarms
+                    appendLog("🔔 已复制 \(alarms.count) 个告警")
+                }
+                
+                do {
+                    try eventStore.save(newEvent, span: .thisEvent)
+                    formattedCount += 1
+                    appendLog("✅ 已创建新事件: \(newTitle)")
+                } catch {
+                    appendLog("❌ 创建事件失败: \(error.localizedDescription)")
+                }
+            } else {
+                appendLog("⚠️ 解析失败: \(sourceEvent.title)")
+            }
+        }
+        
+        updatedEventCount = formattedCount
+        lastScannedEventCount = flightEvents.count
+        
+        let message = "已创建 \(formattedCount) 个新事件到目标日历"
+        + (skippedCount > 0 ? "（跳过 \(skippedCount) 个重复）" : "")
+        statusMessage = message
+        appendLog("🎉 \(message)")
+        
+        return (formattedCount, flightEvents.count)
+    }
+    
+    /// 检查目标日历中是否已存在相同标题的事件
+    private func doesEventExistInTargetCalendar(withTitle title: String, calendar: EKCalendar) -> Bool {
+        let today = Date()
+        let endDate = Calendar.current.date(byAdding: .year, value: 1, to: today) ?? today
+        let predicate = eventStore.predicateForEvents(withStart: today, end: endDate, calendars: [calendar])
+        
+        let events = eventStore.events(matching: predicate)
+        return events.contains { $0.title == title }
     }
     
     // MARK: - 快捷指令支持
