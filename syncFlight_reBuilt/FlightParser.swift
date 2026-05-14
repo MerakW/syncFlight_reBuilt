@@ -85,14 +85,18 @@ struct FlightParser {
                 return nil
             }
             
-            let depTerminal = extractGroup("depTerminal")
-            
+            let extractedTerminal = extractGroup("depTerminal")
+
+            // 在原始标题中出现的航站楼通常表示到达航站楼（例：北京-上海 T2），
+            // 因此优先使用解析到的终点航站楼；如果不存在，则使用预测值。
+            let arrivalTerm = extractedTerminal ?? predictArrivalTerminal(for: flight)
+
             return FlightDetails(
                 flightNumber: flight,
                 departureAirport: departure,
                 arrivalAirport: arrival,
-                departureTerminal: depTerminal,
-                arrivalTerminal: predictArrivalTerminal(for: flight),
+                departureTerminal: nil,
+                arrivalTerminal: arrivalTerm,
                 timeRange: timeRange
             )
         } catch {
@@ -130,16 +134,23 @@ struct FlightParser {
         let arrCode = AirportDictionary.mappedCode(for: details.arrivalAirport)
         
         var title = "[FLIGHT] \(details.flightNumber) \(depCode)-\(arrCode)"
-        
-        if let depTerminal = details.departureTerminal {
-            title += " \(depTerminal)"
+
+        // 收集非空且不重复的航站楼信息
+        var terminals: [String] = []
+        if let depTerminal = details.departureTerminal, !depTerminal.isEmpty {
+            terminals.append(depTerminal)
         }
-        
-        if let arrTerminal = details.arrivalTerminal {
-            title += " \(arrTerminal)"
+        if let arrTerminal = details.arrivalTerminal, !arrTerminal.isEmpty {
+            if terminals.last != arrTerminal {
+                terminals.append(arrTerminal)
+            }
         }
-        
-        title += "｜Local Time \(details.timeRange) [CTZ]"
+
+        if !terminals.isEmpty {
+            title += " " + terminals.joined(separator: " ")
+        }
+
+        title += "｜Local Time \(details.timeRange) [SYNCFL]"
         
         return title
     }

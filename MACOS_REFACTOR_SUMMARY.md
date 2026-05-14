@@ -20,7 +20,7 @@
 - **功能**：解析航旅纵横格式的航班信息
 - **解析格式**：
   - 输入：`乘坐CA123 北京-上海 T1 当地时间10:30-13:45 【航旅纵横】`
-  - 输出：`[FLIGHT] CA123 PEK-PVG T1 T2｜Local Time 10:30-13:45 [CTZ]`
+  - 输出：`[FLIGHT] CA123 PEK-PVG T1 T2｜Local Time 10:30-13:45 [SYNCFL]`
 - **特性**：
   - 使用 NSRegularExpression 进行可靠的模式匹配
   - 支持 Unicode 中文字符匹配

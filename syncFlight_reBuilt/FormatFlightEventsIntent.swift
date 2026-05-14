@@ -18,9 +18,11 @@ struct FormatFlightEventsIntent: AppIntent {
             return .result(value: result)
         }
         
-        // 检查日历选择
-        guard manager.selectedCalendarIdentifier != nil else {
-            let result = "未选择日历，请先在应用中选择目标日历"
+        // 检查当前模式下是否已配置好日历
+        guard manager.canFormatUpcomingFlightEvents else {
+            let result = manager.useSeparateCalendars
+                ? "未配置源日历或目标日历，请先在应用中完成设置"
+                : "未选择日历，请先在应用中选择目标日历"
             return .result(value: result)
         }
         

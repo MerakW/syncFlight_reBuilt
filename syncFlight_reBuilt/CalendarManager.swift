@@ -62,6 +62,22 @@ class CalendarManager: NSObject, ObservableObject {
     }
     
     @Published var hasCalendarAccess: Bool = false
+
+    /// 当前模式下用于读取/写入的目标日历
+    var activeCalendarIdentifier: String? {
+        useSeparateCalendars ? targetCalendarIdentifier : selectedCalendarIdentifier
+    }
+
+    /// 当前配置是否足以开始同步
+    var canFormatUpcomingFlightEvents: Bool {
+        if useSeparateCalendars {
+            guard let source = sourceCalendarIdentifier,
+                  let target = targetCalendarIdentifier else { return false }
+            return source != target
+        }
+
+        return selectedCalendarIdentifier != nil
+    }
     
     override init() {
         super.init()
@@ -101,7 +117,12 @@ class CalendarManager: NSObject, ObservableObject {
             return false
         case .notDetermined:
             do {
-                let granted = try await eventStore.requestAccess(to: .event)
+                let granted: Bool
+                if #available(macOS 14.0, *) {
+                    granted = try await eventStore.requestFullAccessToEvents()
+                } else {
+                    granted = try await eventStore.requestAccess(to: .event)
+                }
                 hasCalendarAccess = granted
                 if granted {
                     refreshAvailableCalendars()
@@ -283,8 +304,8 @@ class CalendarManager: NSObject, ObservableObject {
                     continue
                 }
                 
-                // 创建新事件到目标日历
-                let newEvent = EKEvent()
+                // 创建新事件到目标日历（必须使用 eventStore 初始化）
+                let newEvent = EKEvent(eventStore: eventStore)
                 newEvent.title = newTitle
                 newEvent.startDate = sourceEvent.startDate
                 newEvent.endDate = sourceEvent.endDate
@@ -296,8 +317,17 @@ class CalendarManager: NSObject, ObservableObject {
                 
                 // 复制告警（如果启用）
                 if copyAlarmsToNewEvents, let alarms = sourceEvent.alarms, !alarms.isEmpty {
-                    newEvent.alarms = alarms
-                    appendLog("🔔 已复制 \(alarms.count) 个告警")
+                    var sanitizedAlarms: [EKAlarm] = []
+                    for alarm in alarms {
+                        if let abs = alarm.absoluteDate {
+                            sanitizedAlarms.append(EKAlarm(absoluteDate: abs))
+                        } else {
+                            // 使用相对偏移创建告警，避免携带不可用的 URL 或其他受限字段
+                            sanitizedAlarms.append(EKAlarm(relativeOffset: alarm.relativeOffset))
+                        }
+                    }
+                    newEvent.alarms = sanitizedAlarms
+                    appendLog("🔔 已复制并清洗 \(sanitizedAlarms.count) 个告警（已移除受限字段）")
                 }
                 
                 do {

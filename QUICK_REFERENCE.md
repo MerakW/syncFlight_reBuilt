@@ -27,16 +27,16 @@
 
 ```
 乘坐CA123 北京-上海 T1 当地时间10:30-13:45 【航旅纵横】
-    ↓ 解析 ↓
-[FLIGHT] CA123 PEK-PVG T1 T3｜Local Time 10:30-13:45 [CTZ]
+   ↓ 解析 ↓
+[FLIGHT] CA123 PEK-PVG T1 T3｜Local Time 10:30-13:45 [SYNCFL]
 
 乘坐MU5147 北京-上海 T1 当地时间10:30-13:45 【航旅纵横】
-    ↓ 解析 ↓
-[FLIGHT] MU5147 PEK-PVG T1 T3｜Local Time 10:30-13:45 [CTZ]
+   ↓ 解析 ↓
+[FLIGHT] MU5147 PEK-PVG T1 T3｜Local Time 10:30-13:45 [SYNCFL]
 
 乘坐9C1234 北京-上海 T1 当地时间10:30-13:45 【航旅纵横】
-    ↓ 解析 ↓
-[FLIGHT] 9C1234 PEK-PVG T1 T3｜Local Time 10:30-13:45 [CTZ]
+   ↓ 解析 ↓
+[FLIGHT] 9C1234 PEK-PVG T1 T3｜Local Time 10:30-13:45 [SYNCFL]
 ```
 
 ---

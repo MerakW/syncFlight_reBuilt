@@ -159,7 +159,7 @@ if doesEventExistInTargetCalendar(withTitle: newTitle, calendar: targetCalendar)
 
 结果：
 📅 同一个日历中的事件被直接修改
-✅ CA123 北京-上海 T1 当地时间10:30-13:45 → [FLIGHT] CA123 PEK-PVG T1 T2｜Local Time 10:30-13:45 [CTZ]
+✅ CA123 北京-上海 T1 当地时间10:30-13:45 → [FLIGHT] CA123 PEK-PVG T1 T2｜Local Time 10:30-13:45 [SYNCFL]
 ```
 
 ### 场景 2：保护原始事件（分离模式）
@@ -269,8 +269,8 @@ if manager.useSeparateCalendars {
 14:23:45 - 📅 开始扫描日历（单日历模式）...
 14:23:45 - 📊 扫描结果: 总事件 15，航班事件 3
 14:23:46 - ⏭️ 跳过已格式化事件: [FLIGHT] CA123 ...
-14:23:46 - ✅ 已格式化: [FLIGHT] MU5147 PEK-SHA T1 T3｜Local Time 10:30-13:45 [CTZ]
-14:23:46 - ✅ 已格式化: [FLIGHT] 9C1234 SHA-CAN T2 T3｜Local Time 14:00-17:15 [CTZ]
+14:23:46 - ✅ 已格式化: [FLIGHT] MU5147 PEK-SHA T1 T3｜Local Time 10:30-13:45 [SYNCFL]
+14:23:46 - ✅ 已格式化: [FLIGHT] 9C1234 SHA-CAN T2 T3｜Local Time 14:00-17:15 [SYNCFL]
 14:23:47 - 🎉 已格式化 2 个航班事件
 ```
 
@@ -278,10 +278,10 @@ if manager.useSeparateCalendars {
 ```
 14:25:30 - 📅 从 '航旅纵横' 读取，写入到 'Flighty'...
 14:25:31 - 📊 源日历扫描结果: 总事件 20，航班事件 5
-14:25:31 - ✅ 已创建新事件: [FLIGHT] CA123 PEK-SHA T1 T3｜Local Time 10:30-13:45 [CTZ]
+14:25:31 - ✅ 已创建新事件: [FLIGHT] CA123 PEK-SHA T1 T3｜Local Time 10:30-13:45 [SYNCFL]
 14:25:31 - 🔔 已复制 1 个告警
-14:25:32 - ⏭️ 跳过重复事件: [FLIGHT] MU5147 PEK-SHA T1 T3｜Local Time 15:45-19:00 [CTZ]
-14:25:33 - ✅ 已创建新事件: [FLIGHT] 9C1234 SHA-CAN T2 T3｜Local Time 14:00-17:15 [CTZ]
+14:25:32 - ⏭️ 跳过重复事件: [FLIGHT] MU5147 PEK-SHA T1 T3｜Local Time 15:45-19:00 [SYNCFL]
+14:25:33 - ✅ 已创建新事件: [FLIGHT] 9C1234 SHA-CAN T2 T3｜Local Time 14:00-17:15 [SYNCFL]
 14:25:33 - 🎉 已创建 2 个新事件到目标日历（跳过 1 个重复）
 ```
 

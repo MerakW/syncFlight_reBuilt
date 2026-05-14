@@ -103,19 +103,61 @@ struct ContentView: View {
                         // 日历选择部分
                         if manager.hasCalendarAccess {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("📅 选择目标日历")
+                                Text(manager.useSeparateCalendars ? "📅 日历选择（分离模式）" : "📅 选择目标日历")
                                     .font(.system(.headline, design: .default))
                                 
-                                Picker("日历", selection: $manager.selectedCalendarIdentifier) {
-                                    Text("-- 请选择 --").tag(nil as String?)
-                                    
-                                    ForEach(manager.availableCalendars, id: \.id) { calendar in
-                                        Text(calendar.title)
-                                            .tag(calendar.id as String?)
+                                if manager.useSeparateCalendars {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("源日历（读取）")
+                                                .font(.system(.caption, design: .default))
+                                                .foregroundColor(.blue)
+                                            
+                                            Picker("源日历", selection: $manager.sourceCalendarIdentifier) {
+                                                Text("-- 请选择 --").tag(nil as String?)
+                                                
+                                                ForEach(manager.availableCalendars, id: \.id) { calendar in
+                                                    Text(calendar.title)
+                                                        .tag(calendar.id as String?)
+                                                }
+                                            }
+                                            .pickerStyle(.menu)
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("目标日历（写入）")
+                                                .font(.system(.caption, design: .default))
+                                                .foregroundColor(.green)
+                                            
+                                            Picker("目标日历", selection: $manager.targetCalendarIdentifier) {
+                                                Text("-- 请选择 --").tag(nil as String?)
+                                                
+                                                ForEach(manager.availableCalendars, id: \.id) { calendar in
+                                                    Text(calendar.title)
+                                                        .tag(calendar.id as String?)
+                                                }
+                                            }
+                                            .pickerStyle(.menu)
+                                        }
+                                        
+                                        if manager.sourceCalendarIdentifier == manager.targetCalendarIdentifier && manager.sourceCalendarIdentifier != nil {
+                                            Text("源日历和目标日历不能相同")
+                                                .font(.system(.caption, design: .default))
+                                                .foregroundColor(.orange)
+                                        }
                                     }
+                                } else {
+                                    Picker("日历", selection: $manager.selectedCalendarIdentifier) {
+                                        Text("-- 请选择 --").tag(nil as String?)
+                                        
+                                        ForEach(manager.availableCalendars, id: \.id) { calendar in
+                                            Text(calendar.title)
+                                                .tag(calendar.id as String?)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .frame(maxWidth: .infinity)
                                 }
-                                .pickerStyle(.menu)
-                                .frame(maxWidth: .infinity)
                             }
                             .padding(16)
                             .background(Color(nsColor: .controlBackgroundColor))
@@ -133,8 +175,8 @@ struct ContentView: View {
                                 .font(.system(.body, design: .default))
                             }
                             .buttonStyle(.borderedProminent)
-                            .disabled(manager.selectedCalendarIdentifier == nil)
-                            .help("扫描并转换选定日历中的航班事件")
+                            .disabled(!manager.canFormatUpcomingFlightEvents)
+                            .help(manager.useSeparateCalendars ? "扫描源日历并写入目标日历中的航班事件" : "扫描并转换选定日历中的航班事件")
                             
                             // 日志面板
                             LogsPanelView(manager: manager)

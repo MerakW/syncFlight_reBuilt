@@ -2,7 +2,8 @@ import Foundation
 
 /// 中文机场名称到 IATA 代码的映射字典
 struct AirportDictionary {
-    static let chineseToIATA: [String: String] = [
+    static var chineseToIATA: [String: String] {
+        [
         // 北京
         "北京": "PEK",
         "北京首都": "PEK",
@@ -281,7 +282,6 @@ struct AirportDictionary {
         "张家界": "DYG",
         "张家界荷花": "DYG",
         
-        "吉林": "CGQ",
         "长春": "CGQ",
         "长春龙嘉": "CGQ",
         "龙嘉": "CGQ",
@@ -359,8 +359,9 @@ struct AirportDictionary {
         "伊宁": "YLW",
         
         // 额外的常见变体
-        "机场": "",  // 占位符，需要特殊处理
-    ]
+        "机场": "机场"
+        ]
+    }
     
     /// 将中文机场名称映射为 IATA 代码
     /// - Parameter airportName: 中文机场名称或城市名
